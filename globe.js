@@ -1,4 +1,8 @@
 let scene, camera, renderer, globe, controls;
+let currentTextureIndex = 0;
+let textures = [];
+let isTextureMode = false;
+let countryLines = new THREE.Group(); // Group to hold all country border lines
 
 function latLonToVector3(lat, lon, radius) {
     const phi = (90 - lat) * (Math.PI / 180);
@@ -30,7 +34,7 @@ function addGeoJsonRegions(geojson, radius = 0.5, color = 0xd94d14) {
                     const geometry = new THREE.BufferGeometry().setFromPoints(points);
                     const material = new THREE.LineBasicMaterial({ color: color, transparent: true, opacity: 0.7, linewidth: 0.5 });
                     const line = new THREE.Line(geometry, material);
-                    globe.add(line);
+                    countryLines.add(line); // Add to the country lines group instead of directly to globe
                 });
             });
         }
@@ -68,6 +72,11 @@ function init() {
     // Increase widthSegments and heightSegments for smoother sphere
     const geometry = new THREE.SphereGeometry(0.5, 48, 48);
 
+    // Load textures
+    const textureLoader = new THREE.TextureLoader();
+    textures.push(textureLoader.load('globe_map.jpg'));
+    textures.push(textureLoader.load('land_ocean_ice_cloud_2048.jpg'));
+
     // Use MeshBasicMaterial for flat, unlit appearance, RGB(91, 103, 113) with transparency
     let material = new THREE.MeshBasicMaterial({ 
         color: new THREE.Color(91 / 255, 103 / 255, 113 / 255),
@@ -77,6 +86,9 @@ function init() {
 
     globe = new THREE.Mesh(geometry, material);
     scene.add(globe);
+
+    // Add the country lines group to the globe so they rotate together
+    globe.add(countryLines);
 
     // Show country/region borders using geo data
     loadGeoJsonAndAddRegions('countries.geojson'); // Place countries.geojson in your src folder
@@ -111,5 +123,50 @@ function onWindowResize() {
     camera.updateProjectionMatrix();
     renderer.setSize(window.innerWidth, window.innerHeight);
 }
+
+function toggleTexture() {
+    if (!isTextureMode) {
+        // Switch to texture mode
+        isTextureMode = true;
+        globe.material = new THREE.MeshBasicMaterial({ 
+            map: textures[currentTextureIndex]
+        });
+        countryLines.visible = false; // Hide country lines in texture mode
+        document.getElementById('texture-toggle').textContent = 'Switch to Color Mode';
+    } else {
+        // Cycle through textures
+        currentTextureIndex = (currentTextureIndex + 1) % textures.length;
+        globe.material = new THREE.MeshBasicMaterial({ 
+            map: textures[currentTextureIndex]
+        });
+        // Lines remain hidden in texture mode
+    }
+}
+
+function resetToColorMode() {
+    isTextureMode = false;
+    currentTextureIndex = 0;
+    globe.material = new THREE.MeshBasicMaterial({ 
+        color: new THREE.Color(91 / 255, 103 / 255, 113 / 255),
+        transparent: true,
+        opacity: 0.3
+    });
+    countryLines.visible = true; // Show country lines in color mode
+    document.getElementById('texture-toggle').textContent = 'Switch to Texture Mode';
+}
+
+// Add event listeners after DOM is loaded
+document.addEventListener('DOMContentLoaded', function() {
+    const toggleButton = document.getElementById('texture-toggle');
+    const resetButton = document.getElementById('color-reset');
+    
+    if (toggleButton) {
+        toggleButton.addEventListener('click', toggleTexture);
+    }
+    
+    if (resetButton) {
+        resetButton.addEventListener('click', resetToColorMode);
+    }
+});
 
 init();
